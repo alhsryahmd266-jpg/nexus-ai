@@ -1,0 +1,79 @@
+name: Deploy NEXUS AI to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate Icons
+        run: |
+          # Generate simple SVG icons as PNG using Python
+          python3 -c "
+import base64
+
+svg_192 = '''<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"192\" height=\"192\">
+  <defs>
+    <radialGradient id=\"g\" cx=\"50%\" cy=\"50%\">
+      <stop offset=\"0%\" stop-color=\"#6366f1\"/>
+      <stop offset=\"100%\" stop-color=\"#0d0d24\"/>
+    </radialGradient>
+  </defs>
+  <rect width=\"192\" height=\"192\" rx=\"40\" fill=\"url(#g)\"/>
+  <text x=\"96\" y=\"130\" font-size=\"100\" text-anchor=\"middle\">🧠</text>
+</svg>'''
+
+svg_512 = svg_192.replace('192', '512').replace('96', '256').replace('130', '340').replace('40', '100').replace('100', '260')
+
+with open('icon-192.svg','w') as f: f.write(svg_192)
+with open('icon-512.svg','w') as f: f.write(svg_512)
+print('Icons created')
+"
+          # Convert SVG to PNG
+          if command -v convert &> /dev/null; then
+            convert icon-192.svg icon-192.png
+            convert icon-512.svg icon-512.png
+          else
+            cp icon-192.svg icon-192.png
+            cp icon-512.svg icon-512.png
+          fi
+
+      - name: Verify files
+        run: |
+          echo "=== Files to deploy ==="
+          ls -la
+          echo "=== index.html size ==="
+          wc -c index.html
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          publish_branch: gh-pages
+          exclude_assets: '.github,*.yml,*.md,*.svg'
+          commit_message: '🧠 NEXUS AI Deploy — ${{ github.sha }}'
+          force_orphan: false
+
+      - name: Output URL
+        run: |
+          REPO="${{ github.repository }}"
+          USER=$(echo $REPO | cut -d'/' -f1)
+          REPONAME=$(echo $REPO | cut -d'/' -f2)
+          echo "✅ NEXUS AI deployed!"
+          echo "🌐 URL: https://${USER}.github.io/${REPONAME}/"
